@@ -14,7 +14,11 @@ connect();
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: 'https://chattermind-1.onrender.com',
+  credentials: true
+}));
+
 app.use(morgan('dev')); // for getting the info of api; like GET / 200 4.634 ms - 11
 app.use(express.json());
 app.use(express.urlencoded({extended : true}));
