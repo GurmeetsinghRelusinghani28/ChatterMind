@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import redisClient from "../services/redis.service.js";
+// import redisClient from "../services/redis.service.js";
 
 
 export const authUser = async (req, res, next) => {
@@ -10,7 +10,8 @@ export const authUser = async (req, res, next) => {
             return res.status(401).send({ error: 'Unauthorized User trail 1' });
         }
 
-        const isBlackListed = await redisClient.get(token);
+        const isBlackListed = false;
+
         console.log("Blacklisted Token Check:", isBlackListed); // Debugging log
 
 
