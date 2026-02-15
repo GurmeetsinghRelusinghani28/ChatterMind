@@ -15,9 +15,12 @@ connect();
 const app = express();
 
 app.use(cors({
-  origin: 'https://chattermind-1.onrender.com',
+  origin: [
+    'https://chattermind-1.onrender.com'
+  ],
   credentials: true
 }));
+
 
 app.use(morgan('dev')); // for getting the info of api; like GET / 200 4.634 ms - 11
 app.use(express.json());
@@ -26,12 +29,6 @@ app.use(cookieParser());
 app.use('/users',userRoutes);
 app.use('/projects',ProjectRoutes);
 app.use('/ai',aiRoutes);
-
-app.use((req, res, next) => {
-    res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
-    res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
-    next();
-  });
 
 
 app.get('/',(req,res)=>{

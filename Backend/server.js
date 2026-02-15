@@ -16,7 +16,7 @@ console.log("🚀 Server setup starting...");
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "*",
+    origin: "https://chattermind-1.onrender.com",
     methods: ["GET", "POST"],
   },
 });
