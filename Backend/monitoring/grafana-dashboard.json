@@ -1,0 +1,59 @@
+{
+  "title": "ChatterMind Backend",
+  "uid": "chattermind-backend",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-30m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "HTTP Request Rate",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [{ "expr": "sum(rate(chattermind_http_requests_total[5m]))", "legendFormat": "requests/sec" }]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "HTTP Error Rate",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [{ "expr": "sum(rate(chattermind_http_errors_total[5m])) / clamp_min(sum(rate(chattermind_http_requests_total[5m])), 1) * 100", "legendFormat": "errors %" }]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "HTTP p95 Latency",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum(rate(chattermind_http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95 seconds" }]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "MongoDB p95 Query Latency",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum(rate(chattermind_db_query_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95 seconds" }]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Active WebSockets",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 16 },
+      "targets": [{ "expr": "chattermind_websocket_active_connections", "legendFormat": "active" }]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Chat Message Delay",
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 16 },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum(rate(chattermind_chat_message_delay_seconds_bucket[5m])) by (le))", "legendFormat": "p95 seconds" }]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "AI Response Latency",
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 16 },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum(rate(chattermind_ai_response_duration_seconds_bucket[5m])) by (le, operation))", "legendFormat": "{{operation}} p95" }]
+    }
+  ]
+}

@@ -1,6 +1,12 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import dotenv from "dotenv";
 dotenv.config();
+import {
+    CACHE_TTL,
+    cacheKeys,
+    getCache,
+    setCache,
+} from "./redis.service.js";
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_KEY);
 const model = genAI.getGenerativeModel({
@@ -100,7 +106,13 @@ const model = genAI.getGenerativeModel({
 });
 
 
-export const generateResult = async (prompt) => {
+export const generateResult = async (prompt, userId = "anonymous") => {
+    const [namespace, key] = cacheKeys.aiResponse(userId, prompt);
+    const cachedResult = await getCache(namespace, key);
+    if (cachedResult !== null) return cachedResult;
+
   const result = await model.generateContent(prompt);
-  return result.response.text(); // Returns the generated text.
+    const response = result.response.text();
+    await setCache(namespace, key, response, CACHE_TTL.aiResponse);
+    return response;
 };

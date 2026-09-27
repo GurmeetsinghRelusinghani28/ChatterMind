@@ -1,24 +1,43 @@
 import mongoose from 'mongoose';
 import projectModel from '../models/project.model.js';
+import {
+    CACHE_TTL,
+    cacheKeys,
+    deleteCacheByPattern,
+    getCache,
+    recordDatabaseRead,
+    setCache,
+} from './redis.service.js';
 
 
 export const createProject = async ({name,userId}) => {
-    
-    if(!name){
+    const normalizedName = typeof name === 'string' ? name.trim().toLowerCase() : '';
+
+    if(!normalizedName){
         throw new Error('Name is required');
     }
     if(!userId){
         throw new Error('User is required');
     }
-    let project;
+    const existingProject = await projectModel.findOne({ name: normalizedName }).select('_id').lean();
+    if (existingProject) {
+        const duplicateError = new Error('A project with this name already exists. Choose a different name.');
+        duplicateError.code = 'PROJECT_NAME_CONFLICT';
+        throw duplicateError;
+    }
+
     try {
-        project = await projectModel.create({name,users:[userId]});
+        const project = await projectModel.create({ name: normalizedName, users:[userId] });
+        await deleteCacheByPattern('active-rooms');
+        return project;
     } catch (error) {
+        if (error?.code === 11000 && error?.keyPattern?.name) {
+            const duplicateError = new Error('A project with this name already exists. Choose a different name.');
+            duplicateError.code = 'PROJECT_NAME_CONFLICT';
+            throw duplicateError;
+        }
         throw new Error(error.message);
     }
-    
-
-    return project;
 }
 
 
@@ -27,7 +46,13 @@ if(!userId){
     throw new Error('UserId is required');
 }
 
-const allUserProject = await projectModel.find({users:userId})
+const [namespace, key] = cacheKeys.activeRooms(userId);
+const cachedProjects = await getCache(namespace, key);
+if (cachedProjects) return cachedProjects;
+
+recordDatabaseRead();
+const allUserProject = await projectModel.find({users:userId}).sort({ createdAt: -1 }).lean();
+await setCache(namespace, key, allUserProject, CACHE_TTL.activeRooms);
 
 return allUserProject;
 }
@@ -50,7 +75,7 @@ export const addUserToProject = async ({projectId, users, userId}) => {
   );
   
   if (!updatedProject) throw new Error('Project not found');
-  
+    await deleteCacheByPattern('active-rooms');
   return updatedProject;
 }
 
@@ -92,5 +117,6 @@ export const updateFileTree = async({projectId, fileTree}) => {
         new: true
     })
 
+    await deleteCacheByPattern('active-rooms');
     return updatedProject;
 }

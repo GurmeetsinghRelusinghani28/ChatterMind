@@ -1,0 +1,31 @@
+groups:
+  - name: chattermind-backend
+    rules:
+      - alert: ChatterMindHighErrorRate
+        expr: |
+          (
+            sum(rate(chattermind_http_errors_total[5m]))
+            /
+            clamp_min(sum(rate(chattermind_http_requests_total[5m])), 1)
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          service: chattermind-backend
+        annotations:
+          summary: ChatterMind HTTP error rate is above 5%
+          description: More than 5% of HTTP responses have been errors for five minutes.
+
+      - alert: ChatterMindSlowDatabaseQueries
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(chattermind_db_query_duration_seconds_bucket[5m])) by (le)
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: chattermind-backend
+        annotations:
+          summary: ChatterMind database queries are slow
+          description: The p95 MongoDB command latency is above 500ms for five minutes.

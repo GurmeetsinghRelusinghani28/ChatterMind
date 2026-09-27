@@ -10,6 +10,7 @@ This is a full-stack web application that allows multiple users to connect, chat
 - **User Authentication**: Secure user authentication and session management
 - **Responsive UI**: Modern, responsive React-based user interface
 - **Database**: MongoDB for persistent data storage
+- **GitHub Export**: GitHub OAuth plus the Git Trees API exports the current project as one private repository commit
 
 ## Tech Stack
 
@@ -34,6 +35,22 @@ This is a full-stack web application that allows multiple users to connect, chat
 4. Configure environment variables
 5. Start the server: `npm start`
 6. Start the frontend: `cd client && npm start`
+
+### GitHub export setup
+
+Create a GitHub OAuth App with this callback URL:
+`http://localhost:8080/api/github/callback`
+
+Copy `Backend/.env.example` to `Backend/.env` and provide `GITHUB_CLIENT_ID` and
+`GITHUB_CLIENT_SECRET`. The backend stores the GitHub access token in an HttpOnly
+cookie; it is never persisted in frontend local storage or sent in the browser URL.
+
+Run locally from the repository root:
+
+```powershell
+cd Backend; npm install; npm run dev
+cd ..\Frontend; npm install; npm run dev
+```
 
 ## Usage
 

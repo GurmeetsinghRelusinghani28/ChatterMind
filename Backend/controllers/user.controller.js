@@ -1,6 +1,7 @@
 import userModel from '../models/user.model.js';
 import * as userService from '../services/user.service.js';
 import { validationResult } from 'express-validator';
+import * as redisService from '../services/redis.service.js';
 // import redisClient from '../services/redis.service.js';
 
 export const createUserController = async (req,res)=>{
@@ -59,11 +60,23 @@ export const loginController = async (req,res)=>{
 }
 
 export const profileController = async (req, res) => {
-
-    res.status(200).json({
-        user: req.user
-    });
+    const user = await userService.getUserProfile({ userId: req.user._id });
+    res.status(200).json({ user });
 }
+
+export const updateProfileController = async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+    const user = await userService.updateUserProfile({
+        userId: req.user._id,
+        username: req.body.username,
+    });
+    return res.status(200).json({ user });
+};
+
+export const cacheMetricsController = async (req, res) => {
+    res.status(200).json(await redisService.getRedisDashboardData());
+};
 
 // export const logoutController = async(req,res) => {
 //     try {

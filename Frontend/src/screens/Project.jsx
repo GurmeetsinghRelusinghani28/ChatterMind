@@ -7,21 +7,24 @@ import {
   sendMessage,
 } from "../config/socket";
 import { UserContext } from "../context/user.context";
-import Markdown from "markdown-to-jsx";
-import hljs from "highlight.js";
 import { getWebContainer } from "../config/webContainer";
+import GithubExportButton from "../components/GithubExportButton";
 
-function SyntaxHighlightedCode(props) {
+function SyntaxHighlightedCode({ className, children, highlightLib, ...props }) {
   const ref = useRef(null);
 
   React.useEffect(() => {
-    if (ref.current && props.className?.includes("lang-") && window.hljs) {
-      window.hljs.highlightElement(ref.current);
-      ref.current.removeAttribute("data-highlighted");
+    if (ref.current && className?.includes("lang-") && highlightLib) {
+      try {
+        highlightLib.highlightElement(ref.current);
+        ref.current.removeAttribute("data-highlighted");
+      } catch (error) {
+        console.warn("Unable to highlight code block:", error);
+      }
     }
-  }, [props.className, props.children]);
+  }, [className, children, highlightLib]);
 
-  return <code {...props} ref={ref} />;
+  return <code {...props} className={className} ref={ref}>{children}</code>;
 }
 
 const isFileNode = (node) => {
@@ -55,6 +58,8 @@ const Project = () => {
   const [message, setMessage] = useState("");
   const [users, setUsers] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [markdownComponent, setMarkdownComponent] = useState(null);
+  const [highlightLib, setHighlightLib] = useState(null);
   const [selectedUserId, setSelectedUserId] = useState(new Set());
   const [project, setProject] = useState(location.state.project);
   const { user } = useContext(UserContext);
@@ -73,6 +78,27 @@ const Project = () => {
   const [newFileName, setNewFileName] = useState("");
   const [newFileType, setNewFileType] = useState("js");
   const [errors, setErrors] = useState([]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    Promise.all([
+      import("markdown-to-jsx")
+        .then((module) => module.default ?? module)
+        .catch(() => null),
+      import("highlight.js")
+        .then((module) => module.default ?? module)
+        .catch(() => null),
+    ]).then(([MarkdownLib, HighlightLib]) => {
+      if (!mounted) return;
+      setMarkdownComponent(() => MarkdownLib);
+      setHighlightLib(HighlightLib);
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleUserClick = (id) => {
     setSelectedUserId((prevSelectedUserId) => {
@@ -97,16 +123,25 @@ const Project = () => {
       return <p>Error processing AI message</p>;
     }
 
+    const markdownText = messageObject.text || "";
+    const MarkdownComponent = markdownComponent;
+
     return (
       <div className="overflow-auto bg-slate-950 text-white rounded-sm p-2">
-        <Markdown
-          children={messageObject.text || ""}
-          options={{
-            overrides: {
-              code: SyntaxHighlightedCode,
-            },
-          }}
-        />
+        {MarkdownComponent ? (
+          <MarkdownComponent
+            children={markdownText}
+            options={{
+              overrides: {
+                code: (props) => (
+                  <SyntaxHighlightedCode {...props} highlightLib={highlightLib} />
+                ),
+              },
+            }}
+          />
+        ) : (
+          <pre className="whitespace-pre-wrap text-sm text-white">{markdownText}</pre>
+        )}
       </div>
     );
   }
@@ -733,6 +768,7 @@ const activeFileNode = getFileByPath(fileTree, currentFile);
               <i className="ri-add-line"></i>
             </button>
           </div>
+          <GithubExportButton fileTree={fileTree} defaultRepoName={`${project.name || "aichatapplication"}-project`} />
           <div className="file-tree w-full flex-grow overflow-auto p-2">
             {fileTree && Object.keys(fileTree).length > 0 ? (
               renderFileTree(fileTree)
@@ -836,18 +872,20 @@ const activeFileNode = getFileByPath(fileTree, currentFile);
           }
         }}
         dangerouslySetInnerHTML={{
-          __html: hljs.highlight(
-            currentFile.endsWith(".css")
-              ? "css"
-              : currentFile.endsWith(".js") || currentFile.endsWith(".jsx")
-              ? "javascript"
-              : currentFile.endsWith(".html")
-              ? "html"
-              : currentFile.endsWith(".json")
-              ? "json"
-              : "plaintext",
-            activeFileNode.file.contents || ""
-          ).value,
+          __html: highlightLib
+            ? highlightLib.highlight(
+                currentFile.endsWith(".css")
+                  ? "css"
+                  : currentFile.endsWith(".js") || currentFile.endsWith(".jsx")
+                  ? "javascript"
+                  : currentFile.endsWith(".html")
+                  ? "html"
+                  : currentFile.endsWith(".json")
+                  ? "json"
+                  : "plaintext",
+                activeFileNode.file.contents || ""
+              ).value
+            : activeFileNode.file.contents || "",
         }}
         style={{
           whiteSpace: "pre-wrap",

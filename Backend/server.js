@@ -8,6 +8,21 @@ import mongoose from "mongoose";
 import projectModel from "./models/project.model.js";
 import { generateResult } from "./services/ai.service.js";
 import { generateProjectFileTree } from "./services/generator.service.js";
+import connect from "./db/db.js";
+import {
+  cacheRecentMessages,
+  connectRedis,
+  getRecentMessages,
+  invalidateRecentMessages,
+} from "./services/redis.service.js";
+import {
+  observeAiResponse,
+  observeChatMessageDelay,
+  startTerminalMetrics,
+  websocketActive,
+  websocketConnectedTotal,
+  websocketDisconnectedTotal,
+} from "./monitoring/metrics.js";
 
 const port = process.env.PORT || 3000;
 
@@ -16,8 +31,13 @@ console.log("🚀 Server setup starting...");
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "https://chattermind-1.onrender.com",
+    origin: [
+      "https://chattermind-1.onrender.com",
+      "http://localhost:5173",
+      "http://localhost:5174",
+    ],
     methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 
@@ -54,6 +74,8 @@ io.use(async (socket, next) => {
 
 let codeContent = "";
 io.on("connection", (socket) => {
+  websocketActive.inc();
+  websocketConnectedTotal.inc();
   socket.roomId = socket.project._id.toString();
   console.log("a user connected", socket._id);
   socket.join(socket.roomId);
@@ -67,6 +89,14 @@ io.on("connection", (socket) => {
 socket.on("project-message", async (data) => {
   try {
     console.log("📩 Received message:", data);
+    observeChatMessageDelay(data.createdAt);
+
+    const recentMessages = await getRecentMessages(socket.roomId);
+    await invalidateRecentMessages(socket.roomId);
+    await cacheRecentMessages(socket.roomId, [...(recentMessages || []), {
+      ...data,
+      createdAt: new Date().toISOString(),
+    }].slice(-50));
     
     // Broadcast to other users
     socket.broadcast.to(socket.roomId).emit("project-message", data);
@@ -80,7 +110,12 @@ socket.on("project-message", async (data) => {
       console.log("🤖 AI Prompt:", prompt);
       
       // Generate project files
+      const aiStartedAt = process.hrtime.bigint();
       const result = await generateProjectFileTree(prompt);
+      observeAiResponse(
+        "project_generation",
+        Number(process.hrtime.bigint() - aiStartedAt) / 1e9,
+      );
       
       // Send AI response
       io.to(socket.roomId).emit("project-message", {
@@ -99,7 +134,7 @@ socket.on("project-message", async (data) => {
       // Update project in database
       try {
         await projectModel.findByIdAndUpdate(
-          projectId,
+          socket.roomId,
           { fileTree: result.fileTree },
           { new: true }
         );
@@ -135,11 +170,41 @@ socket.on("project-message", async (data) => {
   });
 
   socket.on("disconnect", () => {
+    websocketActive.dec();
+    websocketDisconnectedTotal.inc();
     console.log("user disconnected");
     socket.leave(socket.roomId);
   });
 });
 
-server.listen(port, () => {
-  console.log(`✅ Server is running on http://localhost:${port}`);
-});
+connect()
+  .then(() => {
+    return connectRedis();
+  })
+  .then(async () => {
+    const projects = await projectModel.find({}).sort({ createdAt: -1 }).lean();
+    const { cacheKeys, setCache, CACHE_TTL } = await import("./services/redis.service.js");
+    const projectsByUser = new Map();
+    for (const project of projects) {
+      for (const userId of project.users || []) {
+        const key = userId.toString();
+        if (!projectsByUser.has(key)) projectsByUser.set(key, []);
+        projectsByUser.get(key).push(project);
+      }
+    }
+    for (const [userId, userProjects] of projectsByUser) {
+      const [namespace, key] = cacheKeys.activeRooms(userId);
+      await setCache(namespace, key, userProjects, CACHE_TTL.activeRooms);
+    }
+    console.log(`Cache warmed for ${projectsByUser.size} users`);
+  })
+  .then(() => {
+    startTerminalMetrics();
+    server.listen(port, () => {
+      console.log(`✅ Server is running on http://localhost:${port}`);
+    });
+  })
+  .catch(() => {
+    console.error("Server startup aborted. Check MONGODB_URI and MongoDB network access.");
+    process.exitCode = 1;
+  });

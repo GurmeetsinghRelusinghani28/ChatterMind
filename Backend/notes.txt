@@ -1,0 +1,102 @@
+“In ChatterMind, I used Redis as a distributed caching layer in front of 
+MongoDB and the AI service. I implemented a cache-aside strategy. 
+For frequently accessed data such as user profiles, user lists, active
+collaborative rooms, and recent messages, the application checks Redis 
+first. If the value exists, it returns immediately. 
+If not, it queries MongoDB, returns the result, and stores it in 
+Redis with a TTL. I also cached AI responses using a key composed of 
+the user ID and a SHA-256 hash of the prompt,with a one-hour expiration.
+
+
+I added invalidation when profiles, projects, or messages change,
+so stale data is not kept indefinitely. I also added startup cache warming
+for active rooms and metrics for hits, misses, errors, invalidations, and
+hit rate. MongoDB remains the source of truth, and the application falls 
+back to MongoDB if Redis is unavailable. In my benchmark, Redis achieved 
+a 100% cache hit rate for repeated reads and reduced the measured response 
+time from about 10 milliseconds to about 7.2 milliseconds, 
+a 28.54% improvement, while avoiding 100 repeated database reads.”
+
+Short Answer
+If the interviewer wants a very quick answer:
+
+“I used Redis to cache frequently accessed profiles, active rooms, 
+recent messages, and AI responses. I used cache-aside logic with TTLs 
+and invalidation on updates. Redis reduced repeated MongoDB queries 
+and avoided repeated AI generation. In testing, repeated cached reads 
+achieved a 100% hit rate and improved response time by about 28.54%. 
+MongoDB remains the source of truth, and the application falls back to 
+MongoDB if Redis is unavailable.”
+
+Monitoring setup added
+======================
+
+Prometheus metrics are defined in monitoring/metrics.js and exported at:
+
+	GET http://localhost:8080/metrics
+
+Health is exported at:
+
+	GET http://localhost:8080/health
+
+The health response checks MongoDB and reports Redis availability without making
+Redis a hard dependency for application startup.
+
+Metrics now include:
+
+- HTTP request count, latency histogram, and 4xx/5xx error count.
+- MongoDB command count and query latency from MongoDB command monitoring.
+- Active WebSocket connections, total connections, and disconnections.
+- Chat message delivery delay when the client supplies data.createdAt.
+- AI generation latency for project generation.
+- Redis errors from the cache service.
+
+Alert rules are in monitoring/alerts.yml:
+
+- ChatterMindHighErrorRate fires when HTTP errors exceed 5% for five minutes.
+- ChatterMindSlowDatabaseQueries fires when MongoDB p95 latency exceeds 500ms
+	for five minutes.
+
+The Grafana dashboard definition is monitoring/grafana-dashboard.json. It shows
+request rate, error rate, HTTP p95 latency, MongoDB p95 latency, active sockets,
+chat delay, and AI response latency.
+
+Run the backend:
+
+	npm run dev
+
+Scrape Prometheus text from PowerShell:
+
+	Invoke-WebRequest http://localhost:8080/metrics | Select-Object -ExpandProperty Content
+
+Or from curl:
+
+	curl.exe http://localhost:8080/metrics
+	curl.exe http://localhost:8080/health
+
+Generate test traffic for 30 seconds with 20 concurrent workers:
+
+	npm run load:monitoring
+
+Optional load settings:
+
+	$env:MONITORING_LOAD_CONCURRENCY='100'; $env:MONITORING_LOAD_DURATION='60'; npm run load:monitoring
+
+The load script calls /health and prints completed requests, failures, average
+latency, and requests per second. Then scrape /metrics again to see counters and
+histograms change. METRICS_TERMINAL=true (default) prints selected metrics in the
+backend terminal every 30 seconds; set METRICS_TERMINAL=false to disable it.
+
+Prometheus configuration example:
+
+	scrape_configs:
+		- job_name: chattermind-backend
+			static_configs:
+				- targets: ['localhost:8080']
+
+	rule_files:
+		- monitoring/alerts.yml
+
+The Prometheus endpoint is intended for Prometheus/Grafana scraping. It is not
+authentication-protected, so restrict it to an internal network or add access
+control before exposing the backend publicly.

@@ -1,39 +1,58 @@
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import { Route, BrowserRouter, Routes } from "react-router-dom";
-import Login from "../screens/Login";
-import Register from "../screens/Register";
-import Project from "../screens/Project";
-import Home from "../screens/Home";
 import UserAuth from "../auth/UserAuth";
-import Preview from "../screens/Preview";
+
+const Login = lazy(() => import("../screens/Login"));
+const Register = lazy(() => import("../screens/Register"));
+const Project = lazy(() => import("../screens/Project"));
+const Home = lazy(() => import("../screens/Home"));
+const Preview = lazy(() => import("../screens/Preview"));
+
+const routeFallback = (
+  <div
+    style={{
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      height: "100vh",
+      backgroundColor: "#f3f4f6",
+      color: "#374151",
+      fontSize: "1rem",
+    }}
+  >
+    Loading...
+  </div>
+);
 
 const AppRoutes = () => {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route
-          path="/"
-          element={
-            <UserAuth>
-              <Home />
-            </UserAuth>
-          }
-        />
+      <Suspense fallback={routeFallback}>
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <UserAuth>
+                <Home />
+              </UserAuth>
+            }
+          />
 
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
 
-        <Route path="/project" element={<UserAuth><Project /></UserAuth>} />
+          <Route path="/project" element={<UserAuth><Project /></UserAuth>} />
 
-        <Route
-          path="/preview/:id"
-          element={
-            <UserAuth>
-              <Preview />
-            </UserAuth>
-          }
-        />
-      </Routes>
+          <Route
+            path="/preview/:id"
+            element={
+              <UserAuth>
+                <Preview />
+              </UserAuth>
+            }
+          />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 };

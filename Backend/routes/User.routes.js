@@ -30,6 +30,15 @@ router.get(
   "/profile",userMiddleware.authUser,userController.profileController
 );
 
+router.put(
+  "/profile",
+  userMiddleware.authUser,
+  body("username").isString().trim().isLength({ min: 2, max: 30 }),
+  userController.updateProfileController,
+);
+
+router.get("/cache/metrics", userMiddleware.authUser, userController.cacheMetricsController);
+
 router.get(
     "/logout",userMiddleware.authUser,userController.logoutController
   );

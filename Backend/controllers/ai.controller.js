@@ -9,7 +9,7 @@ export const getResult = async (req, res) => {
         if(!prompt){
             return res.status(400).json({error: 'Input is required'});
         }
-        const result = await ai.generateResult(prompt);
+        const result = await ai.generateResult(prompt, req.user?._id || "anonymous");
         res.status(200).json({result});
     }
     catch(error){

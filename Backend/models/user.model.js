@@ -12,6 +12,12 @@ const userSchema = new mongoose.Schema({
         minLength:[6,'Email must be at least 6 character long'],
         maxLength:[50,'Email must not be longer than 50 characters']
     },
+    username: {
+        type: String,
+        trim: true,
+        minLength: [2, 'Username must be at least 2 characters long'],
+        maxLength: [30, 'Username must not be longer than 30 characters']
+    },
     password:{
         type : String,
         select: false,

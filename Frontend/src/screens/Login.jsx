@@ -27,7 +27,7 @@ const Login = () => {
       setUser(res.data.user)
       navigate('/')
     }).catch((err) => {
-      console.log(err.response.data)
+      console.error('Login failed:', err.response?.data || err.message)
     })
   }
 

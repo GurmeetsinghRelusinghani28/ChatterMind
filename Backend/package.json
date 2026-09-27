@@ -4,6 +4,15 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
+    "dev": "nodemon server.js",
+    "start": "node server.js",
+    "indexes": "node scripts/manage-mongodb-indexes.js create",
+    "indexes:drop": "node scripts/manage-mongodb-indexes.js drop",
+    "indexes:recreate": "node scripts/manage-mongodb-indexes.js recreate",
+    "benchmark:indexes": "node scripts/benchmark-mongodb-indexes.js",
+    "benchmark:indexes:seed": "node scripts/benchmark-mongodb-indexes.js --seed",
+    "benchmark:redis": "node scripts/benchmark-redis-cache.js",
+    "load:monitoring": "node scripts/load-monitoring.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -12,6 +21,7 @@
   "description": "",
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
+    "@octokit/rest": "^21.1.1",
     "bcrypt": "^5.1.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",

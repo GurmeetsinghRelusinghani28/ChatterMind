@@ -38,6 +38,9 @@ export const createProject = async (req, res) => {
     });
   } catch (error) {
     console.error("Error creating project:", error);
+    if (error.code === "PROJECT_NAME_CONFLICT") {
+      return res.status(409).json({ message: error.message });
+    }
     res.status(500).json({
       message: "Server error",
       error: error.message,
